@@ -46,6 +46,9 @@ Do not forget to enable ipv6 forwarding on the IoT Requesting Router(RR).
 # Requirements:
 Patched kernel 5.5.10+ 
 
+# Testbed environment :
+ARCHLinux: Internet Systems Consortium DHCP Server 4.4.1 - SR Role
+
 # Problems and solutions:
 Problem:
 
