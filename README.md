@@ -1,7 +1,7 @@
 # KD6-DHCPv6-PD-DANIRv2
 Lite Kernel DHCPv6 Prefix Delegation &amp; Neighbour Discovery implementation v2.
 
-This is second version (improved) of DHCPv6_PD+ND kernel module  based on the PoC (https://github.com/dmytroshytyi/KD6-DHCPv6-PD-DANIR).
+This is a new version of DHCPv6_PD+ND kernel module inspired by the previous version (PoC) (https://github.com/dmytroshytyi/KD6-DHCPv6-PD-DANIR).
 
 ![alt text](https://github.com/dmytroshytyi/KD6-DHCPv6-PD-DANIRv2/blob/dev/docs/kd6_state_machine.PNG "kd6_state_machine")
 
