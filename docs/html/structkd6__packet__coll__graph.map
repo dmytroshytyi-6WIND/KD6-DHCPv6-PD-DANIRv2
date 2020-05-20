@@ -1,0 +1,10 @@
+<map id="kd6_packet" name="kd6_packet">
+<area shape="rect" id="node1" title=" " alt="" coords="144,199,233,225"/>
+<area shape="rect" id="node2" href="$structkd6__packet__req.html" title=" " alt="" coords="221,109,335,136"/>
+<area shape="rect" id="node3" href="$structkd6__time.html" title=" " alt="" coords="121,5,195,32"/>
+<area shape="rect" id="node8" href="$structkd6__packet__sol.html" title=" " alt="" coords="63,109,176,136"/>
+<area shape="rect" id="node4" href="$structkd6__oro.html" title=" " alt="" coords="5,5,73,32"/>
+<area shape="rect" id="node5" href="$structkd6__client__id.html" title=" " alt="" coords="343,5,442,32"/>
+<area shape="rect" id="node6" href="$structkd6__ia__prefix.html" title=" " alt="" coords="538,5,637,32"/>
+<area shape="rect" id="node7" href="$structkd6__ia__pd.html" title=" " alt="" coords="232,5,313,32"/>
+</map>
