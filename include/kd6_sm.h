@@ -47,10 +47,13 @@
 #define KD6_DECLINE              9
 #define KD6_RECONFIGURE         10
 
-#define KD6_MAX_RCV_RS		1000 		/* Maximum unicast RS packets will be handled */
-#define KD6_MAX_RS_PER_MOMENT 	KD6_MAX_RCV_RS	/* Max number of rs handled per moment by RR */
-#define KD6_CARRIER_TIMEOUT 	120000 		/* Wait for carrier timeout */
-#define KD6_SEND_RA_DELAY	30*1000 	/* milliseconsd */		
+#define KD6_MAX_RCV_RS		5		// Maximum unicast RS packets will be handled per moment.
+						// KD6_MAX_RCV_RS value increasing leads to crashes.
+						// Check the warning about framesize limit during compilation
+
+#define KD6_MAX_RS_PER_MOMENT 	KD6_MAX_RCV_RS	// Max number of rs handled per moment by RR 
+#define KD6_CARRIER_TIMEOUT 	120000 		// Wait for carrier timeout 
+#define KD6_SEND_RA_DELAY	30*1000 	// milliseconsd 		
 
 /*
  * This section defines the variables passed to the moule externally.
@@ -187,10 +190,10 @@ struct icmp6sup_hdr{
          u8 len; 
          u8 eth_addr[6]; 
 }; 
-        struct  kd6_rcvd_rs_ip_dev_strct{
-                struct net_device       dev[KD6_MAX_RCV_RS];
-                struct in6_addr         addr[KD6_MAX_RCV_RS];
-        };
+struct  kd6_rcvd_rs_ip_dev_strct{
+        struct net_device       dev[KD6_MAX_RCV_RS];
+        struct in6_addr         addr[KD6_MAX_RCV_RS];
+};
 
 
 /*

@@ -909,7 +909,7 @@ void	kd6_send_ra_unicast	(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev){
 	u8 ipv6_my_multicast[6]={0x33,0x33,0x00,0x00,0x00,0x01};
 	
 	
-	printk(KERN_INFO "[KD6] send config from RR to CT");
+	printk(KERN_INFO "[KD6] send config via unicast from RR to CT");
 	
 	rtnl_lock();
 	for (kd6_rs_rcvd_frm_ct=0; kd6_rs_rcvd_frm_ct<KD6_MAX_RS_PER_MOMENT; kd6_rs_rcvd_frm_ct++){
@@ -1014,7 +1014,7 @@ void	kd6_send_rs		(char *kd6_if){
 /*
  * Function tests if structure contains receved rs from ip/dev
  */
-/*
+
 bool kd6_received_rs(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev){
 	int ct_rs_num_per_moment;
 	int memcmp_dev;
@@ -1024,16 +1024,17 @@ bool kd6_received_rs(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev){
 	memset(&dev_null, 0, sizeof (struct net_device));
 	memset(&addr_null, 0, sizeof (struct in6_addr));
 	for (ct_rs_num_per_moment=0;ct_rs_num_per_moment<KD6_MAX_RS_PER_MOMENT;ct_rs_num_per_moment++){
-		memcmp_dev=memcmp(&kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment],&dev_null,sizeof(struct net_device));
-		memcmp_addr=memcmp(&kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment],&addr_null, sizeof (struct in6_addr));
-	
-		if ((memcmp_addr != 0) && (memcmp_dev != 0))
+		memcmp_dev=memcmp(&(kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]),&dev_null,sizeof(struct net_device));
+		memcmp_addr=memcmp(&(kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment]),&addr_null, sizeof (struct in6_addr));
+		if ((memcmp_addr != 0) && (memcmp_dev != 0)){
+			printk(KERN_INFO "[KD6] CT(s) request(s) config from RR");
 			return true;
-
+		}
 	}
+	printk(KERN_INFO "[KD6] NO CT(s) request(s) recieved by RR");
 	return false;
 }
-*/
+
 /*
  * Function processes rs on the RR side sent from CT
  */
@@ -1048,6 +1049,8 @@ static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struc
 	if (skb->pkt_type == PACKET_OTHERHOST){
                 goto drop;
         }
+	
+	pr_info("[KD6] if=%s Received packet",skb->dev->name);
         skb = skb_share_check(skb, GFP_ATOMIC);
         if (!skb){
 		pr_info("[KD6] skb issue");
@@ -1070,8 +1073,10 @@ static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struc
 		ct_rs_num_per_moment++;
 
 	// to many clients per moment of time (ignoring loosers... Please wait next moment of time))
-	if (ct_rs_num_per_moment >= KD6_MAX_RS_PER_MOMENT-1)
+	if (ct_rs_num_per_moment >= KD6_MAX_RS_PER_MOMENT-1){
 		goto drop_unlock;
+
+	}
 	
 	// Get device which received the packet
 	kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]=*skb->dev;
@@ -1082,11 +1087,14 @@ static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struc
 
 
         spin_unlock(&kd6_recv_lock);
+	pr_info("[KD6] if=%s RS received on RR side sent from CT",skb->dev->name);
 	return NF_DROP;	
 drop_unlock:
         /* Show's over.  Nothing to see here.  */
-        spin_unlock(&kd6_recv_lock);
+       	spin_unlock(&kd6_recv_lock);
 drop:
+
+	pr_info("[KD6] PACKET NOT OURS OR ERROR");
         return NF_ACCEPT;
 
 }
@@ -1094,14 +1102,18 @@ drop:
  * Function is poling on RR side for received rs from CT
  */
 int	kd6_receive_rs_init		(char* kd6_if_wan, char* kd6_if_lan_all[10],struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev){
+	// WARNING
+	// To be able receive multicast (ff02::2) packets by this function you have enable forwarding sysctl: #net.ipv6.conf.all.forwarding=1
+	
+	
 	//struct net_device* kd6_dev;
         static struct nf_hook_ops kd6_rcv_rs_hook = {
                 .hook = _kd6_receive_rs,
                 //.dev = kd6_dev,
-                ////.pf = NFPROTO_IPV6,
-                .pf = PF_INET6,
+                .pf = NFPROTO_IPV6,
+                //.pf = PF_INET6,
                 .hooknum = (1 << NF_INET_PRE_ROUTING),
-                .priority = NF_IP6_PRI_FIRST,
+		.priority = NF_IP6_PRI_FIRST,
         };
 	//we pass the pointer of kd6_rcvd_rs_ip_dev to callback to fill this structure inside callback.
 	kd6_rcv_rs_hook.priv=kd6_rcvd_rs_ip_dev;
@@ -1117,10 +1129,10 @@ void 	kd6_receive_rs_cleanup(char *kd6_if){
         static struct nf_hook_ops kd6_rcv_rs_hook = {
                 .hook = _kd6_receive_rs,
                 //.dev = kd6_dev,
-                ////.pf = NFPROTO_IPV6,
-                .pf = PF_INET6,
+                .pf = NFPROTO_IPV6,
+                //.pf = PF_INET6,
                 .hooknum = (1 << NF_INET_PRE_ROUTING),
-                .priority = NF_IP6_PRI_FIRST,
+		.priority = NF_IP6_PRI_FIRST,
         };
 	printk(KERN_INFO "[KD6] if=%s Cleanup of kd6_rcv_rs_hook.",(char *)kd6_if);
 	nf_unregister_net_hook (&init_net, &kd6_rcv_rs_hook);
@@ -1260,7 +1272,7 @@ int _kd6_open_if_lan(char* kd6_if_lan_all[10]){
 	rtnl_lock();         
 	/* bring loopback and DSA master network devices up first */
 	for (kd6_dev_cnt=0;kd6_dev_cnt<10;kd6_dev_cnt++) {
-	   if (kd6_if_lan_all[kd6_dev_cnt] != NULL){
+	    if (kd6_if_lan_all[kd6_dev_cnt] != NULL){
 		kd6_dev = kmalloc(sizeof (struct net_device),GFP_KERNEL);
         	kd6_dev=dev_get_by_name(&init_net,kd6_if_lan_all[kd6_dev_cnt]);
 		if (!kd6_dev){
@@ -1274,7 +1286,7 @@ int _kd6_open_if_lan(char* kd6_if_lan_all[10]){
                 if (dev_change_flags(kd6_dev, kd6_dev->flags | IFF_UP, NULL) < 0)
                         pr_err("[KD6] Failed to open %s\n", kd6_dev->name);
 		if (kd6_dev->mtu >= 364){
-                        pr_info("[KD6] Device %s is suitable to send",(char *) kd6_dev);
+                        pr_info("[KD6] Device %s is suitable to send",kd6_dev->name);
                 }else{
                         pr_warn("[KD6] Ignoring device %s, MTU %d too small\n",
                                         kd6_dev->name, kd6_dev->mtu);
@@ -1290,10 +1302,12 @@ int _kd6_open_if_lan(char* kd6_if_lan_all[10]){
  */
 int	kd6_open_ifs	(char* kd6_if_wan,char* kd6_if_lan_all[10]){
 	printk(KERN_INFO "[KD6] if=%s Open device/interface",kd6_if_wan);
-	if (_kd6_open_if_wan(kd6_if_wan)>0)
+	if ((_kd6_open_if_lan(kd6_if_lan_all)>0) || (_kd6_open_if_wan(kd6_if_wan)>0) )
 		return 1;
-	if (_kd6_open_if_lan(kd6_if_lan_all)>0)
-		return 1;
+	//if (_kd6_open_if_lan(kd6_if_lan_all)>0)
+	//	return 1;
+	//
+	
 	//wait until wan if is up and has ll_addr before to continue
 	ssleep (5);
 	return 0;
