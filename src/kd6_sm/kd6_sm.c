@@ -35,14 +35,18 @@ int kd6_state_machine (void* data){
 	struct 	kd6_rcvd_rs_ip_dev_strct kd6_rcvd_rs_ip_dev;		// This structure handles the dev and addr where rs received.
 	bool 	(*ptr_th_should_stop)(void) = &kthread_should_stop;	// Pointer to the thread stop func.
 	int 	ct_rs_num_per_moment;					// counter
-	
+	int 	kd6_rcv_rs_hook;					//contains pointer to registered hook
 /*
   	struct in6_addr KD6_LINK_LOCAL_MULTICAST = {{{ 0xff,02,0,0,0,0,0,0,0,0,0,0,0,1,0,2 }}};
 	struct in6_addr KD6_LINK_LOCAL = {{{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }}};
 	struct in6_addr KD6_LINK_NULL = {{{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }}};
 */
 	// Set struct fields to 0;
-	memset(&kd6_rcvd_rs_ip_dev,0,sizeof(struct kd6_rcvd_rs_ip_dev_strct));
+	//memset(&kd6_rcvd_rs_ip_dev,0,sizeof(struct kd6_rcvd_rs_ip_dev_strct));
+	// dev init in rcvd_rs_ip_dev struct
+	for (ct_rs_num_per_moment=0;ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT;ct_rs_num_per_moment++)
+		kd6_rcvd_rs_ip_dev.dev[ct_rs_num_per_moment]=kzalloc(sizeof (struct net_device), GFP_KERNEL);
+
 /*
 	for (ct_rs_num_per_moment=0;ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT; ct_rs_num_per_moment++){
 		memset(&(kd6_rcvd_rs_ip_dev.dev[ct_rs_num_per_moment]),0,sizeof(struct net_device));
@@ -188,16 +192,17 @@ int kd6_state_machine (void* data){
 				}	
 				//activate the hook to sniff for received rs	
 				if (!kd6_receive_rs_active){
-					kd6_receive_rs_init(kd6_if_wan,kd6_if_lan_all,&kd6_rcvd_rs_ip_dev);
+					kd6_rcv_rs_hook=kd6_receive_rs_init(kd6_if_wan,kd6_if_lan_all,&kd6_rcvd_rs_ip_dev);
 					kd6_receive_rs_active=true;
 					break;
 				}
 				// analyse if we have received the rs on any of dev	
+/*
 				if (kd6_received_rs(&kd6_rcvd_rs_ip_dev)){
 					kd6_state=kd6_config_exchange;
 					break;
 				}
-
+*/
 				ssleep (1);
 			}
                         break;
@@ -261,7 +266,7 @@ int kd6_state_machine (void* data){
                                 kd6_setup_ifs(kd6_if_wan,kd6_if_lan_all);
                                 kd6_setup_def_route(kd6_if_wan);
 
-
+/*
 				if (kd6_received_rs(&kd6_rcvd_rs_ip_dev)){
 					kd6_send_ra_unicast(&kd6_rcvd_rs_ip_dev);
 					// Set struct fields to 0;
@@ -272,7 +277,7 @@ int kd6_state_machine (void* data){
 					kd6_state=kd6_config_in_sync;
 					break;
 				}
-
+*/
 				// if unicast is sent multicast isn't because of break in the unicast if-section.
 				kd6_send_ra_multicast(kd6_if_lan_all);
 				kd6_timer_renew=jiffies;
@@ -305,7 +310,7 @@ int kd6_state_machine (void* data){
 			ssleep (2);
 			// we don't waining to receive the rs packet when we finish.
 			if (kd6_receive_rs_active){
-				kd6_receive_rs_cleanup(kd6_if_wan);
+				kd6_receive_rs_cleanup(kd6_if_wan,&kd6_rcvd_rs_ip_dev,kd6_rcv_rs_hook);
 				kd6_receive_rs_active=false;
 			}
 			kd6_state=kd6_init;
@@ -314,7 +319,7 @@ int kd6_state_machine (void* data){
 	}
 
 	if (kd6_receive_rs_active){
-		kd6_receive_rs_cleanup(kd6_if_wan);
+		kd6_receive_rs_cleanup(kd6_if_wan,&kd6_rcvd_rs_ip_dev,kd6_rcv_rs_hook);
 		kd6_receive_rs_active=false;
 	}
 	kd6_close_ifs(kd6_if_wan,kd6_if_lan_all);

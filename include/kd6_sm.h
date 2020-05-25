@@ -191,7 +191,7 @@ struct icmp6sup_hdr{
          u8 eth_addr[6]; 
 }; 
 struct  kd6_rcvd_rs_ip_dev_strct{
-        struct net_device       dev[KD6_MAX_RCV_RS];
+        struct net_device*      dev[KD6_MAX_RCV_RS];
         struct in6_addr         addr[KD6_MAX_RCV_RS];
 };
 
@@ -315,4 +315,4 @@ int kd6_receive_rs_init(char* kd6_if_wan, char* kd6_if_lan_all[10],struct kd6_rc
 /*
  * Function cleans the rs packet listener on RR side.
  */
-void    kd6_receive_rs_cleanup(char *kd6_if);
+void    kd6_receive_rs_cleanup(char *kd6_if, struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev, int kd6_rcv_rs_hook);

@@ -914,7 +914,7 @@ void	kd6_send_ra_unicast	(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev){
 	rtnl_lock();
 	for (kd6_rs_rcvd_frm_ct=0; kd6_rs_rcvd_frm_ct<KD6_MAX_RS_PER_MOMENT; kd6_rs_rcvd_frm_ct++){
 		dev = kmalloc(sizeof (struct net_device),GFP_KERNEL);
-        	dev = &kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct];
+        	dev = kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct];
 		
 		skb = alloc_skb(sizeof(struct ethhdr) +
 	                        sizeof(struct ipv6hdr)+
@@ -1039,18 +1039,19 @@ bool kd6_received_rs(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev){
  * Function processes rs on the RR side sent from CT
  */
 static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struct nf_hook_state *state){
-	int ct_rs_num_per_moment=0;
 
-        struct ipv6hdr *ipv6h;
+	int ct_rs_num_per_moment=0;
+	int ct_rs_num_per_moment_cnt=0;
+       	struct ipv6hdr *ipv6h;
 	struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev;
 
 	kd6_rcvd_rs_ip_dev=(struct kd6_rcvd_rs_ip_dev_strct *)priv;
-        
+	
 	if (skb->pkt_type == PACKET_OTHERHOST){
                 goto drop;
         }
 	
-	pr_info("[KD6] if=%s Received packet",skb->dev->name);
+
         skb = skb_share_check(skb, GFP_ATOMIC);
         if (!skb){
 		pr_info("[KD6] skb issue");
@@ -1069,32 +1070,33 @@ static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struc
 	        goto drop_unlock;
 
 	// Put the counter in the position of last added rs to the array.
-	while ((kd6_rcvd_rs_ip_dev->dev != NULL) && (ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT-1))
+/*
+	while ((kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]->name[0]) && (ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT-1))
 		ct_rs_num_per_moment++;
-
+*/
 	// to many clients per moment of time (ignoring loosers... Please wait next moment of time))
+/*
 	if (ct_rs_num_per_moment >= KD6_MAX_RS_PER_MOMENT-1){
 		goto drop_unlock;
-
 	}
-	
-	// Get device which received the packet
-	kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]=*skb->dev;
-        
-	// Get senders (clients) ipv6 adress.
-        ipv6h = (struct ipv6hdr *) skb_pull (skb,sizeof (struct ipv6hdr));
-	kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment]=ipv6h->saddr;
-
-
-        spin_unlock(&kd6_recv_lock);
-	pr_info("[KD6] if=%s RS received on RR side sent from CT",skb->dev->name);
+*/
+/*
+	for (ct_rs_num_per_moment_cnt=0;ct_rs_num_per_moment_cnt < ct_rs_num_per_moment;ct_rs_num_per_moment_cnt++){
+		// Get device which received the packet
+		//memcpy (kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment],skb->dev,sizeof (struct net_device));
+		// Get senders (clients) ipv6 adress.
+        	//ipv6h = (struct ipv6hdr *) skb_pull (skb,sizeof (struct ipv6hdr));
+		kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment_cnt]=ipv6h->saddr;
+	}
+  */
+  	spin_unlock(&kd6_recv_lock);
+	pr_info("[KD6] RS received on RR side sent from CT");
 	return NF_DROP;	
 drop_unlock:
-        /* Show's over.  Nothing to see here.  */
+        // Show's over.  Nothing to see here.  
        	spin_unlock(&kd6_recv_lock);
 drop:
 
-	pr_info("[KD6] PACKET NOT OURS OR ERROR");
         return NF_ACCEPT;
 
 }
@@ -1106,36 +1108,26 @@ int	kd6_receive_rs_init		(char* kd6_if_wan, char* kd6_if_lan_all[10],struct kd6_
 	// To be able receive multicast (ff02::2) packets by this function you have enable forwarding sysctl: #net.ipv6.conf.all.forwarding=1
 	
 	
-	//struct net_device* kd6_dev;
         static struct nf_hook_ops kd6_rcv_rs_hook = {
                 .hook = _kd6_receive_rs,
-                //.dev = kd6_dev,
-                .pf = NFPROTO_IPV6,
-                //.pf = PF_INET6,
+                .pf = PF_INET6,
                 .hooknum = (1 << NF_INET_PRE_ROUTING),
 		.priority = NF_IP6_PRI_FIRST,
         };
 	//we pass the pointer of kd6_rcvd_rs_ip_dev to callback to fill this structure inside callback.
-	kd6_rcv_rs_hook.priv=kd6_rcvd_rs_ip_dev;
+	kd6_rcv_rs_hook.priv = kmalloc (sizeof(kd6_rcvd_rs_ip_dev) ,GFP_KERNEL);
+	kd6_rcv_rs_hook.priv = kd6_rcvd_rs_ip_dev;
 	printk(KERN_INFO "[KD6] if=%s Poling on RR side for received rs from CT",kd6_if_wan);
         nf_register_net_hook (&init_net, &kd6_rcv_rs_hook);
-	return 0;
+
+	return &kd6_rcv_rs_hook;
 }
 /*
  * Function cleans the rs packet listener on RR side.
  */
-void 	kd6_receive_rs_cleanup(char *kd6_if){	
-
-        static struct nf_hook_ops kd6_rcv_rs_hook = {
-                .hook = _kd6_receive_rs,
-                //.dev = kd6_dev,
-                .pf = NFPROTO_IPV6,
-                //.pf = PF_INET6,
-                .hooknum = (1 << NF_INET_PRE_ROUTING),
-		.priority = NF_IP6_PRI_FIRST,
-        };
-	printk(KERN_INFO "[KD6] if=%s Cleanup of kd6_rcv_rs_hook.",(char *)kd6_if);
-	nf_unregister_net_hook (&init_net, &kd6_rcv_rs_hook);
+void 	kd6_receive_rs_cleanup(char *kd6_if,struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev, int kd6_rcv_rs_hook){	
+	printk(KERN_INFO "[KD6] if=%s Cleanup of kd6_rcv_rs_hook.",kd6_if);
+	nf_unregister_net_hook (&init_net, kd6_rcv_rs_hook);
 }
 /*
  * Function is poling on the RR side for renew from SR
