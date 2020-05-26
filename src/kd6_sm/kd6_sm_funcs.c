@@ -1043,6 +1043,7 @@ static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struc
 	int ct_rs_num_per_moment=0;
 	int ct_rs_num_per_moment_cnt=0;
        	struct ipv6hdr *ipv6h;
+       	struct icmp6hdr *icmpv6h;
 	struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev;
 
 	kd6_rcvd_rs_ip_dev=(struct kd6_rcvd_rs_ip_dev_strct *)priv;
@@ -1069,6 +1070,17 @@ static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struc
         if (!pskb_may_pull(skb, skb->len))
 	        goto drop_unlock;
 
+	// Check if L3 packet has inner icmp6hdr
+	if (ipv6h->nexthdr != 58){
+		pr_info("ipv6 packet doesn't have inner icmp6hdr on if %s. Received= %d",skb->dev->name,ipv6h->nexthdr);
+		goto drop_unlock;
+	}
+
+	// Check  if icmp6hdr has rs type
+	icmpv6h = (struct icmp6hdr*) icmp6_hdr (skb);
+	if (icmpv6h->icmp6_type != 133)
+		goto drop_unlock;
+	
 	// Put the counter in the position of last added rs to the array.
 	// while dev_name is empty and counter does not exceedes frames, fill dev_name and addr in array.
 	while ( !(kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]->name[0]) && 
@@ -1082,28 +1094,10 @@ static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struc
 			ct_rs_num_per_moment++;
 	}
 	pr_info("num of recvd pkts: %d",ct_rs_num_per_moment);
-/*
-	// to many clients per moment of time (ignoring loosers... Please wait next moment of time))
 
-	if (ct_rs_num_per_moment >= KD6_MAX_RS_PER_MOMENT-1){
-		goto drop_unlock;
-	}
-*/
-/*
-	for (ct_rs_num_per_moment_cnt=0;ct_rs_num_per_moment_cnt < KD6_MAX_RS_PER_MOMENT-1;ct_rs_num_per_moment_cnt++){
-		pr_info("[KD6] pkt received on if=%d",kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment_cnt]->name[0]);	
-	}
-*/
-/*
-	for (ct_rs_num_per_moment_cnt=0;ct_rs_num_per_moment_cnt < ct_rs_num_per_moment;ct_rs_num_per_moment_cnt++){
-		// Get device which received the packet
-		memcpy (kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment_cnt],skb->dev,sizeof (struct net_device));
-		// Get senders (clients) ipv6 adress.
-        	//ipv6h = (struct ipv6hdr *) skb_pull (skb,sizeof (struct ipv6hdr));
-		kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment_cnt]=ipv6h->saddr;
-	}
-*/
-  	spin_unlock(&kd6_recv_lock);
+
+
+	spin_unlock(&kd6_recv_lock);
 	pr_info("[KD6] RS received on RR side sent from CT");
 	return NF_DROP;	
 drop_unlock:
