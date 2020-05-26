@@ -1070,25 +1070,39 @@ static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struc
 	        goto drop_unlock;
 
 	// Put the counter in the position of last added rs to the array.
+	// while dev_name is empty and counter does not exceedes frames, fill dev_name and addr in array.
+	while ( !(kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]->name[0]) && 
+		(ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT-1)){
+			if (ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT-1){
+				// Get device which received the packet
+				kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]=skb->dev;
+				// Get senders (clients) ipv6 adress.
+				kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment]=ipv6h->saddr;
+			}
+			ct_rs_num_per_moment++;
+	}
+	pr_info("num of recvd pkts: %d",ct_rs_num_per_moment);
 /*
-	while ((kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]->name[0]) && (ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT-1))
-		ct_rs_num_per_moment++;
-*/
 	// to many clients per moment of time (ignoring loosers... Please wait next moment of time))
-/*
+
 	if (ct_rs_num_per_moment >= KD6_MAX_RS_PER_MOMENT-1){
 		goto drop_unlock;
 	}
 */
 /*
+	for (ct_rs_num_per_moment_cnt=0;ct_rs_num_per_moment_cnt < KD6_MAX_RS_PER_MOMENT-1;ct_rs_num_per_moment_cnt++){
+		pr_info("[KD6] pkt received on if=%d",kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment_cnt]->name[0]);	
+	}
+*/
+/*
 	for (ct_rs_num_per_moment_cnt=0;ct_rs_num_per_moment_cnt < ct_rs_num_per_moment;ct_rs_num_per_moment_cnt++){
 		// Get device which received the packet
-		//memcpy (kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment],skb->dev,sizeof (struct net_device));
+		memcpy (kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment_cnt],skb->dev,sizeof (struct net_device));
 		// Get senders (clients) ipv6 adress.
         	//ipv6h = (struct ipv6hdr *) skb_pull (skb,sizeof (struct ipv6hdr));
 		kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment_cnt]=ipv6h->saddr;
 	}
-  */
+*/
   	spin_unlock(&kd6_recv_lock);
 	pr_info("[KD6] RS received on RR side sent from CT");
 	return NF_DROP;	

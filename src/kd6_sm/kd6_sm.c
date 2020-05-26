@@ -41,18 +41,11 @@ int kd6_state_machine (void* data){
 	struct in6_addr KD6_LINK_LOCAL = {{{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }}};
 	struct in6_addr KD6_LINK_NULL = {{{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }}};
 */
-	// Set struct fields to 0;
-	//memset(&kd6_rcvd_rs_ip_dev,0,sizeof(struct kd6_rcvd_rs_ip_dev_strct));
-	// dev init in rcvd_rs_ip_dev struct
+	// Mem alloc with "0"s for net_dev;
 	for (ct_rs_num_per_moment=0;ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT;ct_rs_num_per_moment++)
 		kd6_rcvd_rs_ip_dev.dev[ct_rs_num_per_moment]=kzalloc(sizeof (struct net_device), GFP_KERNEL);
-
-/*
-	for (ct_rs_num_per_moment=0;ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT; ct_rs_num_per_moment++){
-		memset(&(kd6_rcvd_rs_ip_dev.dev[ct_rs_num_per_moment]),0,sizeof(struct net_device));
-		memset(&(kd6_rcvd_rs_ip_dev.addr[ct_rs_num_per_moment]),0,sizeof(struct in6_addr));
-	}
-*/
+	
+	
 	kd6_sm_args_struct=(struct kd6_sm_args*) data;
 	sr=kd6_sm_args_struct->sr;
 	rr=kd6_sm_args_struct->rr;
