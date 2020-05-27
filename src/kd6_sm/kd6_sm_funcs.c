@@ -640,7 +640,7 @@ static unsigned int _kd6_receive_reply(void *priv, struct sk_buff *skb, const st
 
         dhp = (u8 *) udph + dh6_offset;
         dhp+=1; //Transaction ID pointer
-	memset(rx_xid,dhp,3*sizeof(u8));
+	//memset(rx_xid,dhp,3*sizeof(u8));
         memcpy(rx_xid,dhp,3*sizeof(u8));
         if (memcmp(rx_xid, kd6_xid,3) != 0){
                net_err_ratelimited("[KD6] Reply not for us, ,rx_xid[%x%x%x],internal_xid [%x%x%x]\n",
@@ -767,19 +767,21 @@ void	kd6_setup_def_route	(char *kd6_if){
 
 	printk(KERN_INFO "[KD6] if=%s Configuring default route",kd6_if);
         kd6_dev = kmalloc(sizeof (struct net_device),GFP_KERNEL);
-        kd6_dev=dev_get_by_name(&init_net,kd6_if);
+        //rtnl_lock();
+	kd6_dev=dev_get_by_name(&init_net,kd6_if);
 	//need to setup default route
         rt = rt6_add_dflt_router(&init_net, &kd6_servaddr, kd6_dev, ICMPV6_ROUTER_PREF_MEDIUM);
         if (!rt) {
                 pr_info("KD6: failed to add default route\n");
-                return;
+                //rtnl_unlock();
+		return;
         }
         if (rt)
                 //set infinite timeout
                 fib6_clean_expires(rt);
         //set finite timeout
         //fib6_set_expires(rt, jiffies + msecs_to_jiffies(ntohl(kd6_global_ia_prefix.valid_lifetime)*1000));
-
+	rtnl_unlock();
 }
 /*
  * Function sends the config from RR to CT via multicast
@@ -900,102 +902,107 @@ void	kd6_send_ra_unicast	(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev){
         struct ethhdr *ethh;
         struct net_device *dev;
         int kd6_rs_rcvd_frm_ct;
-        struct in6_addr LINK_UNICAST;
+        struct in6_addr LINK_LOCAL_ALL_NODES_MULTICAST = {{{ 0xff,02,0,0,0,0,0,0,0,0,0,0,0,0,0,1 }}};
 	struct in6_addr kd6_if_addr_global = {{{ 0, }}};
         struct in6_addr kd6_if_addr_ll = {{{ 0, }}};
         struct icmp6sup_hdr *icmp6h;
 	u8 lladdr[6];
 	__wsum csum; 
 	u8 ipv6_my_multicast[6]={0x33,0x33,0x00,0x00,0x00,0x01};
-	
-	
+	char    kd6_dev_name_null[IFNAMSIZ];
 	printk(KERN_INFO "[KD6] send config via unicast from RR to CT");
 	
+	memset (kd6_dev_name_null,0, sizeof (char)*IFNAMSIZ);
 	rtnl_lock();
 	for (kd6_rs_rcvd_frm_ct=0; kd6_rs_rcvd_frm_ct<KD6_MAX_RS_PER_MOMENT; kd6_rs_rcvd_frm_ct++){
-		dev = kmalloc(sizeof (struct net_device),GFP_KERNEL);
-        	dev = kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct];
+	   if (kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct] != NULL){
+	   	if ((kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct]->name != NULL)&&
+		(memcmp(kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct]->name,
+      			kd6_dev_name_null,sizeof (char)*IFNAMSIZ)!=0)
+		   ){
+			dev = kmalloc(sizeof (struct net_device),GFP_KERNEL);
+	        	dev = kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct];
+			skb = alloc_skb(sizeof(struct ethhdr) +
+		                        sizeof(struct ipv6hdr)+
+		                        sizeof(struct icmp6hdr), GFP_KERNEL);
+		        if (!skb)
+		                return;
+		        //memset (skb, 0, sizeof(*skb));
 		
-		skb = alloc_skb(sizeof(struct ethhdr) +
-	                        sizeof(struct ipv6hdr)+
-	                        sizeof(struct icmp6hdr), GFP_KERNEL);
-	        if (!skb)
-	                return;
-	        //memset (skb, 0, sizeof(*skb));
-	
-	        skb->dev = dev;
-	        skb->pkt_type = PACKET_OUTGOING;
-	        skb->protocol = htons(ETH_P_IPV6);
-	        skb->no_fcs = 1;
-	
-	        skb_reserve(skb, sizeof (struct ethhdr) + sizeof(struct icmp6sup_hdr)+ sizeof(struct ipv6hdr));
-	        //      ipv6_dev_get_saddr(&init_net, dev, &LINK_LOCAL_ALL_NODES_MULTICAST, 0, &LINK_LOCAL); 
-	
-	        //icmpv6 base
-		icmp6h = (struct icmp6sup_hdr*) skb_push (skb, sizeof (struct icmp6sup_hdr));
-	
-		icmp6h->icmp6h_base.icmp6_type = 134; //icmp ra type
-	        icmp6h->icmp6h_base.icmp6_code = 0;
-	        icmp6h->icmp6h_base.icmp6_dataun.u_nd_ra.router_pref = 3;
-	        icmp6h->icmp6h_base.icmp6_dataun.u_nd_ra.hop_limit = 64;
-	        icmp6h->icmp6h_base.icmp6_dataun.u_nd_ra.rt_lifetime = htons(86400);
-
-		icmp6h->reachable_time = 0;
-	        icmp6h->retransmit_timer = 0;
-	
-	       //icmpv6 slla opt
-	
-	        icmp6h->type_slla = 1;
-	        icmp6h->len = 1;
-
-	        lladdr[0]=0x08;
-	        lladdr[1]=0x00;
-	        lladdr[2]=0x27;
-	        lladdr[3]=0x5e;
-	        lladdr[4]=0x28;
-	        lladdr[5]=0x56;
-	
-	        memcpy(&(icmp6h->eth_addr),lladdr,sizeof(icmp6h->eth_addr));
-	
-	        //      memcpy(&(icmp6h->eth_addr),&(dev->dev_addr),sizeof(icmp6h->eth_addr));
-	
-	        //icmpv6 prefix opt
-	        icmp6h->type_prefix             = 3;
-	        icmp6h->len_prefix_opt          = 4;
-	        icmp6h->prefix_len              = 64;
-	        icmp6h->flag                    = 0xe0;
-	        icmp6h->valid_lifetime          = htonl(86400);
-	        icmp6h->prefered_lifetime       = htonl(14400);
-	
-	        ipv6_dev_get_saddr(&init_net, dev, &LINK_UNICAST, 0, &kd6_rcvd_rs_ip_dev->addr[kd6_rs_rcvd_frm_ct]);
-	        //ipv6_dev_get_saddr(&init_net, dev, &LINK_LOCAL_ALL_NODES_MULTICAST, 0, &kd6_if_addr_ll);
-	
-	        memset(icmp6h->prefix, 0, sizeof(icmp6h->prefix));
-	        memcpy(icmp6h->prefix,&kd6_if_addr_global.in6_u.u6_addr16,(sizeof (icmp6h->prefix))/2);
-	       	//icmpv6 base
-	        icmp6h->icmp6h_base.icmp6_cksum = 0;
-	        csum = csum_partial((char *) icmp6h, sizeof(struct icmp6sup_hdr),0);
-	        icmp6h->icmp6h_base.icmp6_cksum = csum_ipv6_magic(&kd6_if_addr_ll, &LINK_UNICAST,
-	                        sizeof(struct icmp6sup_hdr),IPPROTO_ICMPV6,csum);
-	
-	        //ipv6
-	        ipv6h = (struct ipv6hdr *) skb_push (skb,sizeof (struct ipv6hdr));
-	        ipv6h->version = 6;
-	        ipv6h->nexthdr = IPPROTO_ICMPV6;
-	        ipv6h->payload_len = htons(sizeof(struct icmp6sup_hdr));
-	        ipv6h->daddr = LINK_UNICAST;
-	        ipv6h->saddr= kd6_if_addr_ll;
-	        ipv6h->hop_limit = 255;
-	
-	        //eth
-	        ethh = (struct ethhdr *) skb_push (skb, sizeof(struct ethhdr));
-	        ethh->h_proto = htons(ETH_P_IPV6);
-	        memcpy(ethh->h_source, dev->dev_addr, ETH_ALEN);
-
-	        memcpy (ethh->h_dest, ipv6_my_multicast, sizeof(ipv6_my_multicast));
-		if (dev_queue_xmit(skb) < 0)
-	         	pr_err("[KD6] Error-dev_queue_xmit failed");
+		        skb->dev = dev;
+		        skb->pkt_type = PACKET_OUTGOING;
+		        skb->protocol = htons(ETH_P_IPV6);
+		        skb->no_fcs = 1;
 		
+		        skb_reserve(skb, sizeof (struct ethhdr) + sizeof(struct icmp6sup_hdr)+ sizeof(struct ipv6hdr));
+		        //      ipv6_dev_get_saddr(&init_net, dev, &LINK_LOCAL_ALL_NODES_MULTICAST, 0, &LINK_LOCAL); 
+		
+		        //icmpv6 base
+			icmp6h = (struct icmp6sup_hdr*) skb_push (skb, sizeof (struct icmp6sup_hdr));
+		
+			icmp6h->icmp6h_base.icmp6_type = 134; //icmp ra type
+		        icmp6h->icmp6h_base.icmp6_code = 0;
+		        icmp6h->icmp6h_base.icmp6_dataun.u_nd_ra.router_pref = 3;
+		        icmp6h->icmp6h_base.icmp6_dataun.u_nd_ra.hop_limit = 64;
+		        icmp6h->icmp6h_base.icmp6_dataun.u_nd_ra.rt_lifetime = htons(86400);
+	
+			icmp6h->reachable_time = 0;
+		        icmp6h->retransmit_timer = 0;
+		
+		       //icmpv6 slla opt
+		
+		        icmp6h->type_slla = 1;
+		        icmp6h->len = 1;
+	
+		        lladdr[0]=0x08;
+		        lladdr[1]=0x00;
+		        lladdr[2]=0x27;
+		        lladdr[3]=0x5e;
+		        lladdr[4]=0x28;
+		        lladdr[5]=0x56;
+		
+		        memcpy(&(icmp6h->eth_addr),lladdr,sizeof(icmp6h->eth_addr));
+		
+		        //      memcpy(&(icmp6h->eth_addr),&(dev->dev_addr),sizeof(icmp6h->eth_addr));
+		
+		        //icmpv6 prefix opt
+		        icmp6h->type_prefix             = 3;
+		        icmp6h->len_prefix_opt          = 4;
+		        icmp6h->prefix_len              = 64;
+		        icmp6h->flag                    = 0xe0;
+		        icmp6h->valid_lifetime          = htonl(86400);
+		        icmp6h->prefered_lifetime       = htonl(14400);
+		
+		        ipv6_dev_get_saddr(&init_net, dev, &LINK_LOCAL_ALL_NODES_MULTICAST, 0, &kd6_if_addr_ll);
+		
+		        memset(icmp6h->prefix, 0, sizeof(icmp6h->prefix));
+		        memcpy(icmp6h->prefix,&kd6_if_addr_global.in6_u.u6_addr16,(sizeof (icmp6h->prefix))/2);
+		       	//icmpv6 base
+		        icmp6h->icmp6h_base.icmp6_cksum = 0;
+		        csum = csum_partial((char *) icmp6h, sizeof(struct icmp6sup_hdr),0);
+		
+		        icmp6h->icmp6h_base.icmp6_cksum = csum_ipv6_magic(&kd6_if_addr_ll, 
+					&kd6_rcvd_rs_ip_dev->addr[kd6_rs_rcvd_frm_ct],
+		                        sizeof(struct icmp6sup_hdr),IPPROTO_ICMPV6,csum);
+		        //ipv6
+		        ipv6h = (struct ipv6hdr *) skb_push (skb,sizeof (struct ipv6hdr));
+
+			ipv6h->version = 6;
+		        ipv6h->nexthdr = IPPROTO_ICMPV6;
+		        ipv6h->payload_len = htons(sizeof(struct icmp6sup_hdr));
+			ipv6h->daddr = kd6_rcvd_rs_ip_dev->addr[kd6_rs_rcvd_frm_ct];
+			ipv6h->saddr = kd6_if_addr_ll;
+		        ipv6h->hop_limit = 255;
+		        //eth
+		        ethh = (struct ethhdr *) skb_push (skb, sizeof(struct ethhdr));
+		        ethh->h_proto = htons(ETH_P_IPV6);
+		        memcpy(ethh->h_source, dev->dev_addr, ETH_ALEN);
+	
+		        memcpy (ethh->h_dest, ipv6_my_multicast, sizeof(ipv6_my_multicast));
+			if (dev_queue_xmit(skb) < 0)
+		         	pr_err("[KD6] Error-dev_queue_xmit failed");
+		}
+     	    }	
 	}	
 	rtnl_unlock();
 }
@@ -1023,15 +1030,22 @@ bool kd6_received_rs(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev){
 	struct in6_addr addr_null;
 	memset(&dev_null, 0, sizeof (struct net_device));
 	memset(&addr_null, 0, sizeof (struct in6_addr));
+
+       	spin_lock(&kd6_recv_lock);
 	for (ct_rs_num_per_moment=0;ct_rs_num_per_moment<KD6_MAX_RS_PER_MOMENT;ct_rs_num_per_moment++){
-		memcmp_dev=memcmp(&(kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]),&dev_null,sizeof(struct net_device));
+		if (kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment] == NULL){
+			memcmp_dev=0;
+		}else{
+			memcmp_dev=memcmp(kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment],&dev_null,sizeof(struct net_device));
+		}
 		memcmp_addr=memcmp(&(kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment]),&addr_null, sizeof (struct in6_addr));
 		if ((memcmp_addr != 0) && (memcmp_dev != 0)){
-			printk(KERN_INFO "[KD6] CT(s) request(s) config from RR");
+       			spin_unlock(&kd6_recv_lock);
+			printk(KERN_INFO "[KD6] CT(s) on if = %s request(s) config from RR",kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]->name);
 			return true;
 		}
 	}
-	printk(KERN_INFO "[KD6] NO CT(s) request(s) recieved by RR");
+       	spin_unlock(&kd6_recv_lock);
 	return false;
 }
 
@@ -1040,14 +1054,14 @@ bool kd6_received_rs(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev){
  */
 static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struct nf_hook_state *state){
 
-	int ct_rs_num_per_moment=0;
-	int ct_rs_num_per_moment_cnt=0;
-       	struct ipv6hdr *ipv6h;
-       	struct icmp6hdr *icmpv6h;
-	struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev;
-
-	kd6_rcvd_rs_ip_dev=(struct kd6_rcvd_rs_ip_dev_strct *)priv;
+	int 	ct_rs_num_per_moment=0;
+       	struct 	ipv6hdr *ipv6h;
+       	struct 	icmp6hdr *icmpv6h;
+	struct 	kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev;
+	char 	kd6_dev_name_null[IFNAMSIZ];
 	
+	memset (kd6_dev_name_null,0, sizeof (char)*IFNAMSIZ);
+
 	if (skb->pkt_type == PACKET_OTHERHOST){
                 goto drop;
         }
@@ -1061,7 +1075,10 @@ static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struc
        	
 	
 	spin_lock(&kd6_recv_lock);
-        if (!pskb_may_pull(skb,sizeof(struct ipv6hdr))){
+
+	kd6_rcvd_rs_ip_dev=(struct kd6_rcvd_rs_ip_dev_strct *)priv;
+        
+	if (!pskb_may_pull(skb,sizeof(struct ipv6hdr))){
 		goto drop_unlock;
         }
         ipv6h = (struct ipv6hdr*) skb_network_header(skb);
@@ -1072,30 +1089,37 @@ static unsigned int _kd6_receive_rs(void *priv, struct sk_buff *skb, const struc
 
 	// Check if L3 packet has inner icmp6hdr
 	if (ipv6h->nexthdr != 58){
-		pr_info("ipv6 packet doesn't have inner icmp6hdr on if %s. Received= %d",skb->dev->name,ipv6h->nexthdr);
+//		pr_info("ipv6 packet doesn't have inner icmp6hdr on if %s. Received= %d",skb->dev->name,ipv6h->nexthdr);
 		goto drop_unlock;
 	}
 
 	// Check  if icmp6hdr has rs type
 	icmpv6h = (struct icmp6hdr*) icmp6_hdr (skb);
-	if (icmpv6h->icmp6_type != 133)
+	if (icmpv6h->icmp6_type != 133){
+		goto drop_unlock;
+	}
+	
+	for (ct_rs_num_per_moment=0;ct_rs_num_per_moment<KD6_MAX_RS_PER_MOMENT;ct_rs_num_per_moment++)
+		if (kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment] == NULL)
+			kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]=kzalloc(sizeof (struct net_device), GFP_KERNEL);
+	
+
+	ct_rs_num_per_moment = 0;
+	while ((memcmp(kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]->name,
+                	kd6_dev_name_null,
+                	sizeof (char)*IFNAMSIZ)!=0)&&
+	ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT){
+		ct_rs_num_per_moment++;
+	}
+	//no space in array for new packet
+	if (ct_rs_num_per_moment >= KD6_MAX_RS_PER_MOMENT)
 		goto drop_unlock;
 	
-	// Put the counter in the position of last added rs to the array.
-	// while dev_name is empty and counter does not exceedes frames, fill dev_name and addr in array.
-	while ( !(kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]->name[0]) && 
-		(ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT-1)){
-			if (ct_rs_num_per_moment < KD6_MAX_RS_PER_MOMENT-1){
-				// Get device which received the packet
-				kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]=skb->dev;
-				// Get senders (clients) ipv6 adress.
-				kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment]=ipv6h->saddr;
-			}
-			ct_rs_num_per_moment++;
-	}
-	pr_info("num of recvd pkts: %d",ct_rs_num_per_moment);
 
-
+	// Get device which received the packet
+	kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]=skb->dev;
+	// Get senders (clients) ipv6 adress.
+	kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment]=ipv6h->saddr;
 
 	spin_unlock(&kd6_recv_lock);
 	pr_info("[KD6] RS received on RR side sent from CT");
@@ -1111,7 +1135,7 @@ drop:
 /*
  * Function is poling on RR side for received rs from CT
  */
-int	kd6_receive_rs_init		(char* kd6_if_wan, char* kd6_if_lan_all[10],struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev){
+struct nf_hook_ops*	kd6_receive_rs_init		(char* kd6_if_wan, char* kd6_if_lan_all[10],struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev){
 	// WARNING
 	// To be able receive multicast (ff02::2) packets by this function you have enable forwarding sysctl: #net.ipv6.conf.all.forwarding=1
 	
@@ -1133,7 +1157,7 @@ int	kd6_receive_rs_init		(char* kd6_if_wan, char* kd6_if_lan_all[10],struct kd6_
 /*
  * Function cleans the rs packet listener on RR side.
  */
-void 	kd6_receive_rs_cleanup(char *kd6_if,struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev, int kd6_rcv_rs_hook){	
+void 	kd6_receive_rs_cleanup(char *kd6_if,struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev, struct nf_hook_ops* kd6_rcv_rs_hook){	
 	printk(KERN_INFO "[KD6] if=%s Cleanup of kd6_rcv_rs_hook.",kd6_if);
 	nf_unregister_net_hook (&init_net, kd6_rcv_rs_hook);
 }
@@ -1196,6 +1220,7 @@ void	kd6_close_ifs	(char* kd6_if_wan,char* kd6_if_lan_all[10]){
  */
 static bool  _kd6_is_init_dev(struct net_device *dev){
 	char kd6_user_dev_name[IFNAMSIZ] ;
+	memset (kd6_user_dev_name,0, sizeof (char)*IFNAMSIZ);
 
         if (dev->flags & IFF_LOOPBACK)
                 return false;
@@ -1319,5 +1344,22 @@ void kd6_generate_xid(u8 kd6_xid[3]){
 	get_random_bytes(kd6_xid,sizeof(sizeof(u8)*3));
 }
 
+/*
+ * Function resets the list of CTs that sent rs to RR. 
+ */
+void kd6_reset_rcvd_rs_id_dev(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev){
+	int ct_rs_num_per_moment;
+
+        spin_lock(&kd6_recv_lock);
+	for (ct_rs_num_per_moment=0;ct_rs_num_per_moment<KD6_MAX_RS_PER_MOMENT;ct_rs_num_per_moment++){
+ 		//memset(kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment],0,sizeof(struct net_device));
+
+// 		memset(kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]->name,0,sizeof(char)*IFNAMSIZ);
+
+ 		kd6_rcvd_rs_ip_dev->dev[ct_rs_num_per_moment]=NULL;
+		memset(&(kd6_rcvd_rs_ip_dev->addr[ct_rs_num_per_moment]),0,sizeof(struct in6_addr));
+ 	}
+        spin_unlock(&kd6_recv_lock);
+}
 
 

@@ -47,7 +47,7 @@
 #define KD6_DECLINE              9
 #define KD6_RECONFIGURE         10
 
-#define KD6_MAX_RCV_RS		5		// Maximum unicast RS packets will be handled per moment.
+#define KD6_MAX_RCV_RS		100		// Maximum unicast RS packets will be handled per moment.
 						// KD6_MAX_RCV_RS value increasing leads to crashes.
 						// Check the warning about framesize limit during compilation
 
@@ -191,8 +191,8 @@ struct icmp6sup_hdr{
          u8 eth_addr[6]; 
 }; 
 struct  kd6_rcvd_rs_ip_dev_strct{
-        struct net_device*      dev[KD6_MAX_RCV_RS];
-        struct in6_addr         addr[KD6_MAX_RCV_RS];
+        struct net_device*      dev[KD6_MAX_RCV_RS+1];
+        struct in6_addr         addr[KD6_MAX_RCV_RS+1];
 };
 
 
@@ -311,8 +311,12 @@ bool kd6_received_rs(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev);
 /*
  * Function is poling on RR side for received rs from CT
  */
-int kd6_receive_rs_init(char* kd6_if_wan, char* kd6_if_lan_all[10],struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev);
+struct nf_hook_ops* kd6_receive_rs_init(char* kd6_if_wan, char* kd6_if_lan_all[10],struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev);
 /*
  * Function cleans the rs packet listener on RR side.
  */
-void    kd6_receive_rs_cleanup(char *kd6_if, struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev, int kd6_rcv_rs_hook);
+void    kd6_receive_rs_cleanup(char *kd6_if, struct kd6_rcvd_rs_ip_dev_strct* kd6_rcvd_rs_ip_dev, struct nf_hook_ops* kd6_rcv_rs_hook);
+/*
+ * Function resets the list of CT that sent rs to RR.
+ */
+void kd6_reset_rcvd_rs_id_dev(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev);
