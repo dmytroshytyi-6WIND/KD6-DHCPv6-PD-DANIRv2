@@ -904,6 +904,7 @@ void	kd6_send_ra_unicast	(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev, c
         int 	kd6_rs_rcvd_frm_ct;
 	int 	kd6_if_num;
 	bool	kd6_if_suitable;
+        struct	in6_addr LINK_GLOBAL_UNICAST = {{{ 0x20,0x01,0,0,0,0,0,0,0,0,0,0,0,0,0,0}}};
         struct 	in6_addr LINK_LOCAL_ALL_NODES_MULTICAST = {{{ 0xff,02,0,0,0,0,0,0,0,0,0,0,0,0,0,1 }}};
 	struct 	in6_addr kd6_if_addr_global = {{{ 0, }}};
         struct 	in6_addr kd6_if_addr_ll = {{{ 0, }}};
@@ -995,7 +996,8 @@ void	kd6_send_ra_unicast	(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev, c
 		        icmp6h->prefered_lifetime       = htonl(14400);
 		
 		        ipv6_dev_get_saddr(&init_net, dev, &LINK_LOCAL_ALL_NODES_MULTICAST, 0, &kd6_if_addr_ll);
-		
+	        	ipv6_dev_get_saddr(&init_net, dev, &LINK_GLOBAL_UNICAST, 0, &kd6_if_addr_global);
+
 		        memset(icmp6h->prefix, 0, sizeof(icmp6h->prefix));
 		        memcpy(icmp6h->prefix,&kd6_if_addr_global.in6_u.u6_addr16,(sizeof (icmp6h->prefix))/2);
 		       	//icmpv6 base
