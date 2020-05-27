@@ -18,14 +18,21 @@ Dev branch usually comprises a latest version of the code. Thus feel free to cke
 3) C func prototyping is enabled in this version. File organisation follows the next pattern: (header.h + main.c + funcs.c)
 4) Code is more clean (just few  orphan vars needed for new features like unicast ra on rs. Multicast ra is enabled)
 
-
 # DOCS section
 In the docs folder you may find the kd6_state_machine + software architecture of the kd6_kernel_module.
+![alt text](https://github.com/dmytroshytyi/KD6-DHCPv6-PD-DANIRv2/blob/dev/docs/KD6-DANIR_running_on_archlinux.png "kd6-danir-running-example")
 
+# Usefull commands:
+To get module info(help):
+	modinfo kd6_lkm.ko
 
+To run the module: 
+	sudo insmod kd6_lkm.ko kd6_wan_if_mode=<ALL PORTS/CUSTOM PORTS> kd6_mode=<RR/CT/RS> kd6_if_w0=$wan_if_name kd6_if_l0=$lan_if_name
+	example:
+		sudo insmod kd6_lkm.ko kd6_wan_if_mode=1 kd6_mode=2 kd6_if_w0=enp0s8 kd6_if_l0=enp0s9
 # TODO:
 1. Validation.
-2. Improve and modify: unicast ra as a result of CT rs.
+2. |ADDED| Improve and modify: unicast ra as a result of CT rs. 
 3. CT and SR implementation.
 4. Improve state machine.
 
