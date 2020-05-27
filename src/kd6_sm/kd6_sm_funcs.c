@@ -896,37 +896,58 @@ void	kd6_send_ra_multicast	(char *kd6_if_lan_all[10]){
 /*
  * Function sends the config from RR to CT via unicast
  */
-void	kd6_send_ra_unicast	(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev){
-	struct sk_buff *skb;
-        struct ipv6hdr* ipv6h;
-        struct ethhdr *ethh;
-        struct net_device *dev;
-        int kd6_rs_rcvd_frm_ct;
-        struct in6_addr LINK_LOCAL_ALL_NODES_MULTICAST = {{{ 0xff,02,0,0,0,0,0,0,0,0,0,0,0,0,0,1 }}};
-	struct in6_addr kd6_if_addr_global = {{{ 0, }}};
-        struct in6_addr kd6_if_addr_ll = {{{ 0, }}};
-        struct icmp6sup_hdr *icmp6h;
+void	kd6_send_ra_unicast	(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev, char* kd6_if_lan_all[10]){
+	struct 	sk_buff *skb;
+        struct 	ipv6hdr* ipv6h;
+        struct 	ethhdr *ethh;
+        struct 	net_device *dev;
+        int 	kd6_rs_rcvd_frm_ct;
+	int 	kd6_if_num;
+	bool	kd6_if_suitable;
+        struct 	in6_addr LINK_LOCAL_ALL_NODES_MULTICAST = {{{ 0xff,02,0,0,0,0,0,0,0,0,0,0,0,0,0,1 }}};
+	struct 	in6_addr kd6_if_addr_global = {{{ 0, }}};
+        struct 	in6_addr kd6_if_addr_ll = {{{ 0, }}};
+        struct 	icmp6sup_hdr *icmp6h;
 	u8 lladdr[6];
 	__wsum csum; 
 	u8 ipv6_my_multicast[6]={0x33,0x33,0x00,0x00,0x00,0x01};
 	char    kd6_dev_name_null[IFNAMSIZ];
 	printk(KERN_INFO "[KD6] send config via unicast from RR to CT");
 	
+
 	memset (kd6_dev_name_null,0, sizeof (char)*IFNAMSIZ);
 	rtnl_lock();
+
 	for (kd6_rs_rcvd_frm_ct=0; kd6_rs_rcvd_frm_ct<KD6_MAX_RS_PER_MOMENT; kd6_rs_rcvd_frm_ct++){
 	   if (kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct] != NULL){
 	   	if ((kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct]->name != NULL)&&
 		(memcmp(kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct]->name,
       			kd6_dev_name_null,sizeof (char)*IFNAMSIZ)!=0)
 		   ){
+			//restrict receiving rs only on lan ifs/ignore rs on wan ifs. 
+			kd6_if_suitable = false;
+			for (kd6_if_num=0;kd6_if_num<10;kd6_if_num++){
+				if (kd6_if_lan_all[kd6_if_num] != NULL){
+					if (memcmp(kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct]->name, kd6_if_lan_all[kd6_if_num],strlen(kd6_if_lan_all[kd6_if_num]))==0){
+						kd6_if_suitable=true;
+					}
+				}	
+			}
+			
+			if (!kd6_if_suitable){
+				rtnl_unlock();
+				return;
+			}
+
 			dev = kmalloc(sizeof (struct net_device),GFP_KERNEL);
 	        	dev = kd6_rcvd_rs_ip_dev->dev[kd6_rs_rcvd_frm_ct];
 			skb = alloc_skb(sizeof(struct ethhdr) +
 		                        sizeof(struct ipv6hdr)+
 		                        sizeof(struct icmp6hdr), GFP_KERNEL);
-		        if (!skb)
+		        if (!skb){
+				rtnl_unlock();
 		                return;
+			}
 		        //memset (skb, 0, sizeof(*skb));
 		
 		        skb->dev = dev;

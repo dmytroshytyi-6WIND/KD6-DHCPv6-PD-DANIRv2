@@ -260,7 +260,7 @@ int kd6_state_machine (void* data){
                                 kd6_setup_def_route(kd6_if_wan);
 
 				if (kd6_received_rs(&kd6_rcvd_rs_ip_dev)){
-					kd6_send_ra_unicast(&kd6_rcvd_rs_ip_dev);
+					kd6_send_ra_unicast(&kd6_rcvd_rs_ip_dev,kd6_if_lan_all);
 					//Set struct fields to 0;
 					kd6_reset_rcvd_rs_id_dev(&kd6_rcvd_rs_ip_dev);
 					kd6_state=kd6_config_in_sync;

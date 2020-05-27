@@ -251,7 +251,7 @@ void	kd6_send_ra_multicast		(char *kd6_if_lan_all[10]);
 /*
  * Function sends the config from RR to CT via unicast
  */
-void	kd6_send_ra_unicast		(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev);
+void	kd6_send_ra_unicast		(struct kd6_rcvd_rs_ip_dev_strct *kd6_rcvd_rs_ip_dev, char* kd6_if_lan_all[10]);
 /*
  * Function is poling on CT side for ra from RR
  * */
