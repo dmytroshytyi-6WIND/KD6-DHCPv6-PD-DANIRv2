@@ -40,7 +40,7 @@ To run the module:
 1. Validation.
 2. |ADDED| Improve and modify: unicast ra as a result of CT rs. 
 3. CT and SR implementation.
-4. Improve state machine.
+4. |ADDED a state that configures the if/route only when needed| Improve state machine.
 
 
 # DEMO and IETF docs:
