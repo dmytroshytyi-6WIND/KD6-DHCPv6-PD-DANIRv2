@@ -3,7 +3,7 @@ Lite Kernel DHCPv6 Prefix Delegation &amp; Neighbour Discovery implementation v2
 
 This is a new version of DHCPv6_PD+ND kernel module inspired by the previous version (PoC) (https://github.com/dmytroshytyi/KD6-DHCPv6-PD-DANIR).
 
-![alt text](https://github.com/dmytroshytyi/KD6-DHCPv6-PD-DANIRv2/blob/dev/docs/kd6_state_machine.PNG "kd6_state_machine")
+![alt text](https://github.com/dmytroshytyi/KD6-DHCPv6-PD-DANIRv2/blob/dev/docs/kd6_state_machine_v0.5.png "kd6_state_machine_v0.5")
 
 The kernel in the IoT Router issues a DHCPv6 PD request on its egress interface and obtains a /56. Further it splits multiple /64s out of it and sends RAs with /64 on the ingress interfaces. After clients receive the RA the default route is configured (link-local) address of IoT Requesting Router and /64 prefix is used to configure interface IP address.
 Finally this implementation doesn't include cellular part.
