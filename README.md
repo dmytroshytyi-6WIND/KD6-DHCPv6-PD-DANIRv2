@@ -46,6 +46,7 @@ To run the module:
 # DEMO and IETF docs:
 It is an implementation of draft-shytyi-v6ops-danir-03.txt: https://tools.ietf.org/html/draft-shytyi-v6ops-danir-03
 
+Demo of implementation (v2) : https://www.youtube.com/watch?v=0Yk6aydtFKE
 Demo of implementation (v1) : https://www.youtube.com/watch?v=DymVQY7bCUM
 
 The DEMO recorded the virtual machines output on the IoT Router, the Client device behind it, and the DHCPv6-PD server. 
