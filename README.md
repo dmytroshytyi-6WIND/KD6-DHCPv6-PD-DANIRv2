@@ -27,8 +27,11 @@ To get module info(help):
 	modinfo kd6_lkm.ko
 
 To run the module: 
+
 	sudo insmod kd6_lkm.ko kd6_wan_if_mode=<ALL PORTS/CUSTOM PORTS> kd6_mode=<RR/CT/RS> kd6_if_w0=$wan_if_name kd6_if_l0=$lan_if_name
+
 	example:
+
 		sudo insmod kd6_lkm.ko kd6_wan_if_mode=1 kd6_mode=2 kd6_if_w0=enp0s8 kd6_if_l0=enp0s9
 # TODO:
 1. Validation.
@@ -46,6 +49,8 @@ The DEMO recorded the virtual machines output on the IoT Router, the Client devi
 
 # Compiled with kernel:
 Linux ferby 5.5.10-patchedv5 #1 SMP PREEMPT Thu Mar 19 14:48:05 CET 2020 x86_64 GNU/Linux
+
+Linux ferby 5.6.13pachedkernel-v2 #1 SMP PREEMPT Sat May 16 15:13:02 CEST 2020 x86_64 GNU/Linux
 
 # Suggestions:
 Do not forget to enable ipv6 forwarding on the IoT Requesting Router(RR).
