@@ -33,6 +33,7 @@
 #define kd6_sr_rr_pre_end	10
 #define kd6_sr_rr_end		11
 #define kd6_end			12
+#define kd6_config_rr_prepare	13
 /*
  * KD6 message types 
  */

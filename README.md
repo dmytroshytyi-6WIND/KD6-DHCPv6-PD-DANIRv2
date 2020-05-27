@@ -20,6 +20,9 @@ Dev branch usually comprises a latest version of the code. Thus feel free to cke
 
 # DOCS section
 In the docs folder you may find the kd6_state_machine + software architecture of the kd6_kernel_module.
+
+Example of running KD6_DANIR linux kernel module:
+
 ![alt text](https://github.com/dmytroshytyi/KD6-DHCPv6-PD-DANIRv2/blob/dev/docs/KD6-DANIR_running_on_archlinux.png "kd6-danir-running-example")
 
 # Usefull commands:

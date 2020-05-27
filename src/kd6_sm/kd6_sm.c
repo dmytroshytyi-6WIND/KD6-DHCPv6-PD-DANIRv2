@@ -143,7 +143,8 @@ int kd6_state_machine (void* data){
                         	        break;
 				}
 				kd6_send_request(kd6_if_wan,kd6_xid);
-                        	kd6_state=kd6_config_exchange;
+                        	//kd6_state=kd6_config_exchange;
+				kd6_state=kd6_config_rr_prepare;
 			}
                         break; 
                 case kd6_config_in_sync:
@@ -217,17 +218,31 @@ int kd6_state_machine (void* data){
 				}
 				kd6_send_renew(kd6_if_wan);
 				//kd6_receive_rs(kd6_if_wan);
-				kd6_state=kd6_config_exchange;
+				
+				
+				//kd6_state=kd6_config_exchange;
+				kd6_state=kd6_config_rr_prepare;	
 				break;
 			}
                         break;
+		case kd6_config_rr_prepare:
+			if (kd6_gua_expired){
+				//receive RS
+		       		//bool (*ptr_th_should_stop)(void) = &kthread_should_stop;
+				kd6_receive_reply(kd6_if_wan,kd6_xid,ptr_th_should_stop);
+				kd6_gua_expired = false;
+			}
 
+                        kd6_setup_ifs(kd6_if_wan,kd6_if_lan_all);
+                        kd6_setup_def_route(kd6_if_wan);
+			kd6_state=kd6_config_exchange;
+			break;
 		case kd6_config_exchange:
 			//client
 			if (ct){
 				kd6_receive_ra(kd6_if_wan);
-                                kd6_setup_ifs(kd6_if_wan,kd6_if_lan_all);
-                                kd6_setup_def_route(kd6_if_wan);
+                                //kd6_setup_ifs(kd6_if_wan,kd6_if_lan_all);
+                                //kd6_setup_def_route(kd6_if_wan);
 				
 				kd6_state=kd6_config_in_sync;
 				break;
@@ -249,15 +264,6 @@ int kd6_state_machine (void* data){
                         	        kd6_state=kd6_release_state;
                         	        break;
 				}
-				if (kd6_gua_expired){
-					//receive RS
-			       		//bool (*ptr_th_should_stop)(void) = &kthread_should_stop;
-					kd6_receive_reply(kd6_if_wan,kd6_xid,ptr_th_should_stop);
-					kd6_gua_expired = false;
-				}
-
-                                kd6_setup_ifs(kd6_if_wan,kd6_if_lan_all);
-                                kd6_setup_def_route(kd6_if_wan);
 
 				if (kd6_received_rs(&kd6_rcvd_rs_ip_dev)){
 					kd6_send_ra_unicast(&kd6_rcvd_rs_ip_dev,kd6_if_lan_all);
@@ -274,7 +280,6 @@ int kd6_state_machine (void* data){
 				kd6_state=kd6_config_in_sync;
 			}
                         break;
-
                 case kd6_release_state:
 			//client
 			if (ct){
